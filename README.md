@@ -1,146 +1,25 @@
-shadowsocks
-===========
+shadowsocks comment
+===================
 
-[![PyPI version]][PyPI] [![Build Status]][Travis CI] 
+About
+-----
+Shadowsocks comment is the project helps people to understand [shadowsocks].
 
-A fast tunnel proxy that helps you bypass firewalls.
+We are planning to use github pages to publish our comment, stay tuned to us for more updates.
 
-[中文说明][Chinese Readme]
 
-Install
--------
+Branches
+--------
+Currently, all comments are on branch "comment".
 
-You'll have a client on your local side, and setup a server on a
-remote server.
-
-### Client
-
-* [Windows] / [OS X]
-* [Android] / [iOS]
-* [OpenWRT]
-
-### Server
-
-#### Debian / Ubuntu:
-
-    apt-get install python-pip
-    pip install shadowsocks
-
-Or simply `apt-get install shadowsocks` if you have [Debian sid] in your
-source list.
-
-#### CentOS:
-
-    yum install python-setuptools
-    easy_install pip
-    pip install shadowsocks
-
-#### Windows:
-
-Download OpenSSL for Windows and install. Then install shadowsocks via
-easy_install and pip as Linux. If you don't know how to use them, you can
-directly download [the package], and use `python shadowsocks/server.py`
-instead of `ssserver` command below.
-
-Configuration
--------------
-
-On your server create a config file `/etc/shadowsocks.json`.
-Example:
-
-    {
-        "server":"my_server_ip",
-        "server_port":8388,
-        "local_address": "127.0.0.1",
-        "local_port":1080,
-        "password":"mypassword",
-        "timeout":300,
-        "method":"aes-256-cfb",
-        "fast_open": false,
-        "workers": 1
-    }
-
-Explanation of the fields:
-
-| Name          | Explanation                                     |
-| ------------- | ----------------------------------------------- |
-| server        | the address your server listens                 |
-| server_port   | server port                                     |
-| local_address | the address your local listens                  |
-| local_port    | local port                                      |
-| password      | password used for encryption                    |
-| timeout       | in seconds                                      |
-| method        | default: "aes-256-cfb", see [Encryption]        |
-| fast_open     | use [TCP_FASTOPEN], true / false                |
-| workers       | number of workers, available on Unix/Linux      |
-
-Run `ssserver -c /etc/shadowsocks.json` on your server. To run it in the
-background, use [Supervisor].
-
-On your client machine, use the same configuration as your server, and
-start your client.
-
-If you use Chrome, it's recommended to use [SwitchySharp]. Change the proxy 
-settings to
-
-    protocol: socks5
-    hostname: 127.0.0.1
-    port:     your local_port
-
-If you can't install [SwitchySharp], you can launch Chrome with the following
-arguments to force Chrome to use the proxy:
-
-    Chrome.exe --proxy-server="socks5://127.0.0.1:1080" --host-resolver-rules="MAP * 0.0.0.0 , EXCLUDE localhost"
-
-If you can't even download Chrome, find a friend to download a
-[Chrome Standalone] installer for you.
-
-Command line args
-------------------
-
-You can use args to override settings from `config.json`.
-
-    sslocal -s server_name -p server_port -l local_port -k password -m bf-cfb
-    ssserver -p server_port -k password -m bf-cfb --workers 2
-    ssserver -c /etc/shadowsocks/config.json
-
-List all available args with `-h`.
-
-Wiki
-----
-
-You can find all the documentation in the wiki:
-https://github.com/clowwindy/shadowsocks/wiki
+Master branch will keep synchronzie with clowwindy's branch. 
 
 License
 -------
-MIT
+Shadowsocks code release under MIT license.
 
-Bugs and Issues
-----------------
-
-* [Troubleshooting]
-* [Issue Tracker]
-* [Mailing list]
+All comments release under [CC-BY-NC-SA license].
 
 
-[Android]:           https://github.com/clowwindy/shadowsocks/wiki/Ports-and-Clients#android
-[Build Status]:      https://img.shields.io/travis/clowwindy/shadowsocks/master.svg?style=flat
-[Chinese Readme]:    https://github.com/clowwindy/shadowsocks/wiki/Shadowsocks-%E4%BD%BF%E7%94%A8%E8%AF%B4%E6%98%8E
-[Chrome Standalone]: https://support.google.com/installer/answer/126299
-[Debian sid]:        https://packages.debian.org/unstable/python/shadowsocks
-[the package]:       https://pypi.python.org/pypi/shadowsocks
-[Encryption]:        https://github.com/clowwindy/shadowsocks/wiki/Encryption
-[iOS]:               https://github.com/shadowsocks/shadowsocks-iOS/wiki/Help
-[Issue Tracker]:     https://github.com/clowwindy/shadowsocks/issues?state=open
-[Mailing list]:      http://groups.google.com/group/shadowsocks
-[OpenWRT]:           https://github.com/clowwindy/shadowsocks/wiki/Ports-and-Clients#openwrt
-[OS X]:              https://github.com/shadowsocks/shadowsocks-iOS/wiki/Shadowsocks-for-OSX-Help
-[PyPI]:              https://pypi.python.org/pypi/shadowsocks
-[PyPI version]:      https://img.shields.io/pypi/v/shadowsocks.svg?style=flat
-[Supervisor]:        https://github.com/clowwindy/shadowsocks/wiki/Configure-Shadowsocks-with-Supervisor
-[TCP_FASTOPEN]:      https://github.com/clowwindy/shadowsocks/wiki/TCP-Fast-Open
-[Travis CI]:         https://travis-ci.org/clowwindy/shadowsocks
-[Troubleshooting]:   https://github.com/clowwindy/shadowsocks/wiki/Troubleshooting
-[SwitchySharp]:      https://chrome.google.com/webstore/detail/proxy-switchysharp/dpplabbmogkhghncfbfdeeokoefdjegm
-[Windows]:           https://github.com/clowwindy/shadowsocks/wiki/Ports-and-Clients#windows
+[shadowsocks]:           https://github.com/clowwindy/shadowsocks/
+[CC-BY-NC-SA license]:   https://creativecommons.org/licenses/by-nc-sa/4.0/
