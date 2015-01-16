@@ -55,7 +55,9 @@ EVENT_NAMES = {
     POLL_NVAL: 'POLL_NVAL',
 }
 
-
+# epoll is a Linux kernel system call, a scalable I/O event notification mechanism.
+# It first introduced in Linux kernel 2.5.44
+# So we can only use it under Linux.
 class EpollLoop(object):
 
     def __init__(self):
@@ -73,7 +75,9 @@ class EpollLoop(object):
     def modify_fd(self, fd, mode):
         self._epoll.modify(fd, mode)
 
-
+# Kqueue is a scalable event notification interface introduced in FreeBSD 4.1,
+# It also supported in NetBSD, OpenBSD, DragonflyBSD, and Mac OS X.
+# So we can only use it under Unix System.
 class KqueueLoop(object):
 
     MAX_EVENTS = 1024
@@ -117,9 +121,14 @@ class KqueueLoop(object):
         self.add_fd(fd, mode)
 
 
+#rlist -- wait until ready for reading
+#wlist -- wait until ready for writing
+#xlist -- wait for an ``exceptional condition''
+
 class SelectLoop(object):
 
     def __init__(self):
+        # set is unordered and the elements in it can't be repeated
         self._r_list = set()
         self._w_list = set()
         self._x_list = set()
@@ -157,6 +166,8 @@ class SelectLoop(object):
 class EventLoop(object):
     def __init__(self):
         self._iterating = False
+        # look for the attribute of object.
+        # There are 3 different implement of eventloop in this file, just select one of them ~
         if hasattr(select, 'epoll'):
             self._impl = EpollLoop()
             model = 'epoll'
@@ -169,10 +180,12 @@ class EventLoop(object):
         else:
             raise Exception('can not find any available functions in select '
                             'package')
-        self._fd_to_f = {}
-        self._handlers = []
-        self._ref_handlers = []
-        self._handlers_to_remove = []
+
+        self._fd_to_f = {} # It's dictionary, just think abort a set of key-value elements
+        self._handlers = [] # The list contains all of handlers.
+        self._ref_handlers = [] # The list contains all ref_handlers.
+        self._handlers_to_remove = [] # The list contains the handlers that we want to remove.
+
         logging.debug('using event model: %s', model)
 
     def poll(self, timeout=None):
@@ -180,6 +193,8 @@ class EventLoop(object):
         return [(self._fd_to_f[fd], fd, event) for fd, event in events]
 
     def add(self, f, mode):
+        # we can think fd is the id of "f" --- the file that we want to listen
+        # Since "Every think is a file", so we use fileno() to get the id of "f"
         fd = f.fileno()
         self._fd_to_f[fd] = f
         self._impl.add_fd(fd, mode)
@@ -193,6 +208,8 @@ class EventLoop(object):
         fd = f.fileno()
         self._impl.modify_fd(fd, mode)
 
+    # There are two kind of handler in the case.
+    # One should be the instance of handler, the other is the reference of handler
     def add_handler(self, handler, ref=True):
         self._handlers.append(handler)
         if ref:
@@ -200,18 +217,27 @@ class EventLoop(object):
             self._ref_handlers.append(handler)
 
     def remove_handler(self, handler):
+        # If the handler is one of the reference of handlers, we should remove it at once.
         if handler in self._ref_handlers:
             self._ref_handlers.remove(handler)
+
+        # "Iterating" is a lock of handler list
+        # If it has been locked, that means something is reading or writting it
         if self._iterating:
             self._handlers_to_remove.append(handler)
+        # If not, then we can remove handler in the list at once.
         else:
             self._handlers.remove(handler)
 
+    # Now we can start the loop ~
     def run(self):
         events = []
-        while self._ref_handlers:
+        while self._ref_handlers: # make sure there is at least one ref_handler in the handler list.
             try:
+                # At start , we should get some event, just poll out them, let our see what's happenging ~
+                # Maybe these are many events have happened, just poll them.
                 events = self.poll(1)
+                # If there is something wrong...
             except (OSError, IOError) as e:
                 if errno_from_exception(e) in (errno.EPIPE, errno.EINTR):
                     # EPIPE: Happens when the client closes the connection
@@ -224,14 +250,17 @@ class EventLoop(object):
                     traceback.print_exc()
                     continue
             self._iterating = True
+            # Now we can handler all of the events that have happened.
             for handler in self._handlers:
                 # TODO when there are a lot of handlers
                 try:
+                    # We tell every handler in the list that XXXXX event is happening ~
                     handler(events)
                 except (OSError, IOError) as e:
                     logging.error(e)
                     import traceback
                     traceback.print_exc()
+            # Remove the handlers that we want to remove.
             if self._handlers_to_remove:
                 for handler in self._handlers_to_remove:
                     self._handlers.remove(handler)

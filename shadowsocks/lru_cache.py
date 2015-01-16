@@ -22,7 +22,7 @@
 # SOFTWARE.
 
 from __future__ import absolute_import, division, print_function, \
-    with_statement
+    with_statement  # use the features of python 3
 
 import collections
 import logging
@@ -34,19 +34,20 @@ import time
 # m: visits not timed out, proportional to QPS * timeout
 # get & set is O(1), not O(n). thus we can support very large n
 # TODO: if timeout or QPS is too large, then this cache is not very efficient,
-#       as sweep() causes long pause
+# as sweep() causes long pause
 
 
 class LRUCache(collections.MutableMapping):
     """This class is not thread safe"""
 
     def __init__(self, timeout=60, close_callback=None, *args, **kwargs):
-        self.timeout = timeout
+        self.timeout = timeout  # the cache expire time
         self.close_callback = close_callback
-        self._store = {}
-        self._time_to_keys = collections.defaultdict(list)
-        self._keys_to_last_time = {}
-        self._last_visits = collections.deque()
+        self._store = {}  # dict:store cache data key value
+        self._time_to_keys = collections.defaultdict(list)  # store the time and keys being visited in list.
+        # defaultdict:dict subclass that calls a factory function to supply missing values;
+        self._keys_to_last_time = {}  # dict to store the last time of one key visited.
+        self._last_visits = collections.deque()  # deque store all the time once key is visited.
         self.update(dict(*args, **kwargs))  # use the free update to set keys
 
     def __getitem__(self, key):
@@ -79,19 +80,20 @@ class LRUCache(collections.MutableMapping):
     def sweep(self):
         # O(m)
         now = time.time()
-        c = 0
+        c = 0  # use to log when key swept.
         while len(self._last_visits) > 0:
-            least = self._last_visits[0]
-            if now - least <= self.timeout:
+            least = self._last_visits[0]  # fetch the oldest time point
+            if now - least <= self.timeout:  # the oldest time point hasn't expire
                 break
-            if self.close_callback is not None:
-                for key in self._time_to_keys[least]:
-                    if key in self._store:
-                        if now - self._keys_to_last_time[key] > self.timeout:
+            if self.close_callback is not None:  # callback function has been set
+                for key in self._time_to_keys[least]:  # fetch each key visited on the oldest time
+                    if key in self._store:  # finded the cache key
+                        # get the key of the last time and chech expire or yet.
+                        if now - self._keys_to_last_time[key] > self.timeout:  
                             value = self._store[key]
-                            self.close_callback(value)
+                            self.close_callback(value)  # callback
             for key in self._time_to_keys[least]:
-                self._last_visits.popleft()
+                self._last_visits.popleft()  #can't understand and have error personally
                 if key in self._store:
                     if now - self._keys_to_last_time[key] > self.timeout:
                         del self._store[key]
@@ -131,6 +133,7 @@ def test():
     c.sweep()
     assert 'a' not in c
     assert 'b' not in c
+
 
 if __name__ == '__main__':
     test()
