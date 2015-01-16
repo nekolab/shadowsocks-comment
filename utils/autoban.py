@@ -1,6 +1,7 @@
-#!/usr/bin/env python
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
 
-# Copyright (c) 2014 clowwindy
+# Copyright (c) 2015 clowwindy
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -23,35 +24,28 @@
 from __future__ import absolute_import, division, print_function, \
     with_statement
 
-import hashlib
-
-from shadowsocks.crypto import openssl
-
-__all__ = ['ciphers']
-
-
-def create_cipher(alg, key, iv, op, key_as_bytes=0, d=None, salt=None,
-                  i=1, padding=1):
-    md5 = hashlib.md5()
-    md5.update(key)
-    md5.update(iv)
-    rc4_key = md5.digest()
-    return openssl.OpenSSLCrypto(b'rc4', rc4_key, b'', op)
-
-
-ciphers = {
-    b'rc4-md5': (16, 16, create_cipher),
-}
-
-
-def test():
-    from shadowsocks.crypto import util
-
-    cipher = create_cipher(b'rc4-md5', b'k' * 32, b'i' * 16, 1)
-    decipher = create_cipher(b'rc4-md5', b'k' * 32, b'i' * 16, 0)
-
-    util.run_cipher(cipher, decipher)
-
+import os
+import sys
+import argparse
 
 if __name__ == '__main__':
-    test()
+    parser = argparse.ArgumentParser(description='See README')
+    parser.add_argument('-c', '--count', default=3, type=int,
+                        help='with how many failure times it should be '
+                             'considered as an attack')
+    config = parser.parse_args()
+    ips = {}
+    banned = set()
+    for line in sys.stdin:
+        if 'can not parse header when' in line:
+            ip = line.split()[-1].split(':')[0]
+            if ip not in ips:
+                ips[ip] = 1
+                print(ip)
+            else:
+                ips[ip] += 1
+            if ip not in banned and ips[ip] >= config.count:
+                banned.add(ip)
+                cmd = 'iptables -A INPUT -s %s -j DROP' % ip
+                print(cmd, file=sys.stderr)
+                os.system(cmd)

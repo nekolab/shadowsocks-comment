@@ -28,24 +28,18 @@ import sys
 import hashlib
 import logging
 
-from shadowsocks.crypto import m2, rc4_md5, salsa20_ctr, ctypes_openssl, table
+from shadowsocks.crypto import rc4_md5, openssl, sodium, table
 
 
 method_supported = {}
 method_supported.update(rc4_md5.ciphers)
-method_supported.update(salsa20_ctr.ciphers)
-method_supported.update(ctypes_openssl.ciphers)
-# let M2Crypto override ctypes_openssl
-method_supported.update(m2.ciphers)
+method_supported.update(openssl.ciphers)
+method_supported.update(sodium.ciphers)
 method_supported.update(table.ciphers)
 
 
 def random_string(length):
-    try:
-        import M2Crypto.Rand
-        return M2Crypto.Rand.rand_bytes(length)
-    except ImportError:
-        return os.urandom(length)
+    return os.urandom(length)
 
 
 cached_keys = {}
@@ -60,7 +54,8 @@ def EVP_BytesToKey(password, key_len, iv_len):
     # so that we make the same key and iv as nodejs version
     if hasattr(password, 'encode'):
         password = password.encode('utf-8')
-    r = cached_keys.get(password, None)
+    cached_key = '%s-%d-%d' % (password, key_len, iv_len)
+    r = cached_keys.get(cached_key, None)
     if r:
         return r
     m = []
@@ -76,7 +71,7 @@ def EVP_BytesToKey(password, key_len, iv_len):
     ms = b''.join(m)
     key = ms[:key_len]
     iv = ms[key_len:key_len + iv_len]
-    cached_keys[password] = (key, iv)
+    cached_keys[cached_key] = (key, iv)
     return key, iv
 
 
@@ -161,3 +156,40 @@ def encrypt_all(password, method, op, data):
     cipher = m(method, key, iv, op)
     result.append(cipher.update(data))
     return b''.join(result)
+
+
+CIPHERS_TO_TEST = [
+    b'aes-128-cfb',
+    b'aes-256-cfb',
+    b'rc4-md5',
+    b'salsa20',
+    b'chacha20',
+    b'table',
+]
+
+
+def test_encryptor():
+    from os import urandom
+    plain = urandom(10240)
+    for method in CIPHERS_TO_TEST:
+        logging.warn(method)
+        encryptor = Encryptor(b'key', method)
+        decryptor = Encryptor(b'key', method)
+        cipher = encryptor.encrypt(plain)
+        plain2 = decryptor.decrypt(cipher)
+        assert plain == plain2
+
+
+def test_encrypt_all():
+    from os import urandom
+    plain = urandom(10240)
+    for method in CIPHERS_TO_TEST:
+        logging.warn(method)
+        cipher = encrypt_all(b'key', method, 1, plain)
+        plain2 = encrypt_all(b'key', method, 0, cipher)
+        assert plain == plain2
+
+
+if __name__ == '__main__':
+    test_encrypt_all()
+    test_encryptor()

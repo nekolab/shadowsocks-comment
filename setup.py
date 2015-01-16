@@ -7,12 +7,12 @@ with codecs.open('README.rst', encoding='utf-8') as f:
 
 setup(
     name="shadowsocks",
-    version="2.4.2",
+    version="2.6.4",
     license='MIT',
     description="A fast tunnel proxy that help you get through firewalls",
     author='clowwindy',
     author_email='clowwindy42@gmail.com',
-    url='https://github.com/clowwindy/shadowsocks',
+    url='https://github.com/shadowsocks/shadowsocks',
     packages=['shadowsocks', 'shadowsocks.crypto'],
     package_data={
         'shadowsocks': ['README.rst', 'LICENSE']

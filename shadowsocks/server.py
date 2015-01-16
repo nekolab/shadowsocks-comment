@@ -30,13 +30,16 @@ import logging
 import signal
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../'))
-from shadowsocks import utils, encrypt, eventloop, tcprelay, udprelay, asyncdns
+from shadowsocks import utils, daemon, encrypt, eventloop, tcprelay, udprelay,\
+    asyncdns
 
 
 def main():
     utils.check_python()
 
     config = utils.get_config(False)
+
+    daemon.daemon_exec(config)
 
     utils.print_shadowsocks()
 
@@ -74,6 +77,11 @@ def main():
                      tcp_servers + udp_servers))
         signal.signal(getattr(signal, 'SIGQUIT', signal.SIGTERM),
                       child_handler)
+
+        def int_handler(signum, _):
+            sys.exit(1)
+        signal.signal(signal.SIGINT, int_handler)
+
         try:
             loop = eventloop.EventLoop()
             dns_resolver.add_to_loop(loop)
@@ -104,11 +112,13 @@ def main():
                     for pid in children:
                         try:
                             os.kill(pid, signum)
+                            os.waitpid(pid, 0)
                         except OSError:  # child may already exited
                             pass
                     sys.exit()
                 signal.signal(signal.SIGTERM, handler)
                 signal.signal(signal.SIGQUIT, handler)
+                signal.signal(signal.SIGINT, handler)
 
                 # master
                 for a_tcp_server in tcp_servers:

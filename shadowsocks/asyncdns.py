@@ -114,7 +114,7 @@ def build_address(address):
 # |                     QCLASS                    |
 # +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
 #
-def build_request(address, qtype, request_id):
+def build_request(address, qtype):
     # ! is big endian, H is unsigned short and B is unsigned char.
     # In header, request id is a 16 bit identifier, so use unsigned short to represent it.
     #
@@ -143,11 +143,12 @@ def build_request(address, qtype, request_id):
     # NSCOUNT specifying the number of name server resource records in the authority records section.
     # Since this is a request packet, no answer in this packet so set this field to 0.
     # ARCOUNT specifying the number of resource records in the additional records section, set to 0 in this case.
-    header = struct.pack('!HBBHHHH', request_id, 1, 0, 1, 0, 0, 0)
+    request_id = os.urandom(2)								# Generate random request id
+    header = struct.pack('!BBHHHH', 1, 0, 1, 0, 0, 0)
     addr = build_address(address)    # Convert ordinary address to dns request style address format.
     qtype_qclass = struct.pack('!HH', qtype, QCLASS_IN)     # qtype (16 bit) indicates query type (A, AAAA, CNAME etc.).
                                                             # QCLASS_IN (16 bit) means query on the Internet.
-    return header + addr + qtype_qclass                     # Join them to build a DNS request packet.
+    return request_id + header + addr + qtype_qclass        # Join them to build a DNS request packet.
 
 
 # Resolve RDATA by giving TYPE, data, length and offset
@@ -329,7 +330,6 @@ class DNSResolver(object):
 
     def __init__(self):
         self._loop = None
-        self._request_id = 1
         self._hosts = {}                                # Item parse from /etc/hosts
         self._hostname_status = {}                      # Dict <str hostname, int (STATUS_IPV4|STATUS_IPV6)>
         self._hostname_to_cb = {}                       # Dict <str hostname, list<function callback>>
@@ -370,7 +370,7 @@ class DNSResolver(object):
     # If no item in hosts, use {'localhost': '127.0.0.1'} fill self._hosts
     def _parse_hosts(self):
         etc_path = '/etc/hosts'
-        if os.environ.__contains__('WINDIR'):
+        if 'WINDIR' in os.environ:
             etc_path = os.environ['WINDIR'] + '/system32/drivers/etc/hosts'
         try:
             with open(etc_path, 'rb') as f:
@@ -388,7 +388,7 @@ class DNSResolver(object):
             self._hosts['localhost'] = '127.0.0.1'
 
     # Add dns resolver to event loop
-    def add_to_loop(self, loop):
+    def add_to_loop(self, loop, ref=False):
         if self._loop:
             raise Exception('already add to loop')
         self._loop = loop
@@ -397,22 +397,22 @@ class DNSResolver(object):
                                    socket.SOL_UDP)
         self._sock.setblocking(False)                                       # Non-blocking mode
         loop.add(self._sock, eventloop.POLL_IN)                             # Add socket to loop
-        loop.add_handler(self.handle_events, ref=False)                     # Add self.handle_events to loop handler
+        loop.add_handler(self.handle_events, ref=ref)                     	# Add self.handle_events to loop handler
 
     def _call_callback(self, hostname, ip, error=None):
         callbacks = self._hostname_to_cb.get(hostname, [])              # Get callback list by hostname, default to []
         for callback in callbacks:                                      # Traverse all callbacks
-            if self._cb_to_hostname.__contains__(callback):             # If callback in callback -> hostname map
-                del self._cb_to_hostname[callback]                      # Delete it
+            if callback in self._cb_to_hostname:             			# If callback in callback -> hostname map
+                del self._cb_to_hostname[callback]                      # delete it
             if ip or error:
                 callback((hostname, ip), error)                         # call callback with hostname, ip and error
             else:                                                       # If no ip and no error
                 callback((hostname, None),                              # call callback with hostname, None(IP)
                          Exception('unknown hostname %s' % hostname))   # and an exception about unknown hostname
-        if self._hostname_to_cb.__contains__(hostname):                 # If hostname in hostname -> callback map
-            del self._hostname_to_cb[hostname]                          # Delete it
-        if self._hostname_status.__contains__(hostname):                # If hostname in hostname -> status map
-            del self._hostname_status[hostname]                         # Delete it
+        if hostname in self._hostname_to_cb:                 			# If hostname in hostname -> callback map
+            del self._hostname_to_cb[hostname]                          # delete it
+        if hostname in self._hostname_status:                           # If hostname in hostname -> status map
+            del self._hostname_status[hostname]                         # delete it
 
     def _handle_data(self, data):
         response = parse_response(data)                                 # Parse data received from socket to response
@@ -477,16 +477,12 @@ class DNSResolver(object):
                 arr.remove(callback)                                    # Remove callback from callback list
                 if not arr:                                             # If callback list is empty after remove
                     del self._hostname_to_cb[hostname]                  # Delete the hostname -> empty list map
-                    if self._hostname_status.__contains__(hostname):    # If self._hostname_status contains hostname
-                        del self._hostname_status[hostname]             # Remove it
+                    if hostname in self._hostname_status:               # If self._hostname_status contains hostname
+                        del self._hostname_status[hostname]             # remove it
 
     # Send query request
     def _send_req(self, hostname, qtype):
-        self._request_id += 1                                   # Plus 1 for each request
-        if self._request_id > 32768:                            # TODO: Seems 32768 is signed short but in spec id is
-                                                                # an unsigned short, so the range should be 65536
-            self._request_id = 1                                # Reset if out of range
-        req = build_request(hostname, qtype, self._request_id)  # Build request
+        req = build_request(hostname, qtype)                    # Build request
         for server in self._servers:                            # Send request to each server in self._servers
             logging.debug('resolving %s with type %d using server %s',
                           hostname, qtype, server)
@@ -494,15 +490,17 @@ class DNSResolver(object):
 
     # Resolve hostname
     def resolve(self, hostname, callback):
+        if type(hostname) != bytes:								# Compatible with Python 3
+            hostname = hostname.encode('utf8')					# Convert to bytes
         if not hostname:                                        # Raise exception if hostname is empty
             callback(None, Exception('empty hostname'))
         elif is_ip(hostname):                                   # Directly return if hostname is IP address
             callback((hostname, hostname), None)
-        elif self._hosts.__contains__(hostname):                # Directly return if hostname in /etc/hosts
+        elif hostname in self._hosts:                           # Directly return if hostname in /etc/hosts
             logging.debug('hit hosts: %s', hostname)
             ip = self._hosts[hostname]
             callback((hostname, ip), None)
-        elif self._cache.__contains__(hostname):                # Directly return if hostname hit cache
+        elif hostname in self._cache:                           # Directly return if hostname hit cache
             logging.debug('hit cache: %s', hostname)
             ip = self._cache[hostname]
             callback((hostname, ip), None)
@@ -527,3 +525,52 @@ class DNSResolver(object):
         if self._sock:
             self._sock.close()
             self._sock = None                                   # Release memory?
+
+
+def test():
+    dns_resolver = DNSResolver()
+    loop = eventloop.EventLoop()
+    dns_resolver.add_to_loop(loop, ref=True)
+
+    global counter
+    counter = 0
+
+    def make_callback():
+        global counter
+
+        def callback(result, error):
+            global counter
+            # TODO: what can we assert?
+            print(result, error)
+            counter += 1
+            if counter == 9:
+                loop.remove_handler(dns_resolver.handle_events)
+                dns_resolver.close()
+        a_callback = callback
+        return a_callback
+
+    assert(make_callback() != make_callback())
+
+    dns_resolver.resolve(b'google.com', make_callback())
+    dns_resolver.resolve('google.com', make_callback())
+    dns_resolver.resolve('example.com', make_callback())
+    dns_resolver.resolve('ipv6.google.com', make_callback())
+    dns_resolver.resolve('www.facebook.com', make_callback())
+    dns_resolver.resolve('ns2.google.com', make_callback())
+    dns_resolver.resolve('invalid.@!#$%^&$@.hostname', make_callback())
+    dns_resolver.resolve('toooooooooooooooooooooooooooooooooooooooooooooooooo'
+                         'ooooooooooooooooooooooooooooooooooooooooooooooooooo'
+                         'long.hostname', make_callback())
+    dns_resolver.resolve('toooooooooooooooooooooooooooooooooooooooooooooooooo'
+                         'ooooooooooooooooooooooooooooooooooooooooooooooooooo'
+                         'ooooooooooooooooooooooooooooooooooooooooooooooooooo'
+                         'ooooooooooooooooooooooooooooooooooooooooooooooooooo'
+                         'ooooooooooooooooooooooooooooooooooooooooooooooooooo'
+                         'ooooooooooooooooooooooooooooooooooooooooooooooooooo'
+                         'long.hostname', make_callback())
+
+    loop.run()
+
+
+if __name__ == '__main__':
+    test()
