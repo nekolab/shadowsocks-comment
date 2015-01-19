@@ -41,14 +41,14 @@ class LRUCache(collections.MutableMapping):
     """This class is not thread safe"""
 
     def __init__(self, timeout=60, close_callback=None, *args, **kwargs):
-        self.timeout = timeout  # the cache expire time
+        self.timeout = timeout                              # the cache expire time
         self.close_callback = close_callback
-        self._store = {}  # dict:store cache data key value
+        self._store = {}                                    # dict:store cache data key value
         self._time_to_keys = collections.defaultdict(list)  # store the time and keys being visited in list.
         # defaultdict:dict subclass that calls a factory function to supply missing values;
-        self._keys_to_last_time = {}  # dict to store the last time of one key visited.
-        self._last_visits = collections.deque()  # deque store all the time once key is visited.
-        self.update(dict(*args, **kwargs))  # use the free update to set keys
+        self._keys_to_last_time = {}                        # dict to store the last time of one key visited.
+        self._last_visits = collections.deque()             # deque store all the time once key is visited.
+        self.update(dict(*args, **kwargs))                  # use the free update to set keys
 
     def __getitem__(self, key):
         # O(1)
@@ -80,19 +80,19 @@ class LRUCache(collections.MutableMapping):
     def sweep(self):
         # O(m)
         now = time.time()
-        c = 0  # use to log when key swept.
+        c = 0                                           # use to log when key swept.
         while len(self._last_visits) > 0:
-            least = self._last_visits[0]  # fetch the oldest time point
-            if now - least <= self.timeout:  # the oldest time point hasn't expire
+            least = self._last_visits[0]                # fetch the oldest time point
+            if now - least <= self.timeout:             # the oldest time point hasn't expire
                 break
             if self.close_callback is not None:         # callback function has been set
                 for key in self._time_to_keys[least]:   # fetch each key visited on the oldest time
                     if key in self._store:              # finded the cache key
-                        if now - self._keys_to_last_time[key] > self.timeout:   # get the key of the last time and chech expire or yet.
-                            value = self._store[key]    
+                        if now - self._keys_to_last_time[key] > self.timeout:
+                            value = self._store[key]    # get the key of the last time and check expire or yet.
                             self.close_callback(value)  # callback
             for key in self._time_to_keys[least]:
-                self._last_visits.popleft()             #can't understand and have error personally
+                self._last_visits.popleft()             # can't understand and have error personally
                 if key in self._store:
                     if now - self._keys_to_last_time[key] > self.timeout:
                         del self._store[key]
