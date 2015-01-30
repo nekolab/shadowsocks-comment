@@ -131,6 +131,7 @@ def patch_socket():
 patch_socket()  # Let's rock~
 
 
+# You can find these definition in RFC1928 page 7
 ADDRTYPE_IPV4 = 1
 ADDRTYPE_IPV6 = 4
 ADDRTYPE_HOST = 3
@@ -156,7 +157,10 @@ def pack_addr(address):
     return b'\x03' + chr(len(address)) + address
 
 
-# Parse IPv4/IPv6/Host header in packet to a tuple.
+# +------+----------+----------+----------+
+# | ATYP | DST.ADDR | DST.PORT |   DATA   | (header format)
+# +------+----------+----------+----------+
+# Parse IPv4/IPv6/Host header in packet to a tuple (for shadowsocks package and a part of socks5 package).
 # Returns (address type, destination address in form of bytes, destination port and header length)
 def parse_header(data):
     addrtype = ord(data[0])                                 # Convert first byte from binary to number address type
