@@ -214,7 +214,7 @@ def parse_header(data):
     return addrtype, to_bytes(dest_addr), dest_port, header_length
 
 
-class IPNetwork(object):
+class IPNetwork(object):                                                # Class IPNetwork is used to process CIDR match
     ADDRLENGTH = {socket.AF_INET: 32, socket.AF_INET6: 128, False: 0}
 
     def __init__(self, addrs):
@@ -229,38 +229,38 @@ class IPNetwork(object):
             return
         block = addr.split('/')
         addr_family = is_ip(block[0])
-        addr_len = IPNetwork.ADDRLENGTH[addr_family]
-        if addr_family is socket.AF_INET:
-            ip, = struct.unpack("!I", socket.inet_aton(block[0]))
-        elif addr_family is socket.AF_INET6:
-            hi, lo = struct.unpack("!QQ", inet_pton(addr_family, block[0]))
-            ip = (hi << 64) | lo
+        addr_len = IPNetwork.ADDRLENGTH[addr_family]                            # IPv4 -> 32, IPv6 -> 128
+        if addr_family is socket.AF_INET:                                       # If it's a IPv4 address
+            ip, = struct.unpack("!I", socket.inet_aton(block[0]))               # Unpack IP address to a 32 bit number
+        elif addr_family is socket.AF_INET6:                                    # or it's a IPv6 address
+            hi, lo = struct.unpack("!QQ", inet_pton(addr_family, block[0]))     # Unpack IP address to two 64 bit number
+            ip = (hi << 64) | lo                                                # Combine these to one 128 bit number
         else:
             raise Exception("Not a valid CIDR notation: %s" % addr)
-        if len(block) is 1:
+        if len(block) is 1:                                                     # If no prefix size provided
             prefix_size = 0
-            while (ip & 1) == 0 and ip is not 0:
-                ip >>= 1
-                prefix_size += 1
+            while (ip & 1) == 0 and ip is not 0:                                # Loop to check how many continuous 0
+                ip >>= 1                                                        # on the right of IP Number, get network
+                prefix_size += 1                                                # range and prefix size
             logging.warn("You did't specify CIDR routing prefix size for %s, "
                          "implicit treated as %s/%d" % (addr, addr, addr_len))
-        elif block[1].isdigit() and int(block[1]) <= addr_len:
-            prefix_size = addr_len - int(block[1])
-            ip >>= prefix_size
+        elif block[1].isdigit() and int(block[1]) <= addr_len:                  # If prefix size is provided
+            prefix_size = addr_len - int(block[1])                              # Calculate by using length minus it
+            ip >>= prefix_size                                                  # and get network range
         else:
             raise Exception("Not a valid CIDR notation: %s" % addr)
-        if addr_family is socket.AF_INET:
-            self._network_list_v4.append((ip, prefix_size))
+        if addr_family is socket.AF_INET:                                       # Append (range, prefix_size) to
+            self._network_list_v4.append((ip, prefix_size))                     # specified list
         else:
             self._network_list_v6.append((ip, prefix_size))
 
-    def __contains__(self, addr):
+    def __contains__(self, addr):                                               # Override operator 'in'
         addr_family = is_ip(addr)
         if addr_family is socket.AF_INET:
-            ip, = struct.unpack("!I", socket.inet_aton(addr))
-            return any(map(lambda n_ps: n_ps[0] == ip >> n_ps[1],
-                           self._network_list_v4))
-        elif addr_family is socket.AF_INET6:
+            ip, = struct.unpack("!I", socket.inet_aton(addr))                   # Convert given ip address to number
+            return any(map(lambda n_ps: n_ps[0] == ip >> n_ps[1],               # if any tuple in list matches
+                           self._network_list_v4))                              # range = ip >> prefix_size
+        elif addr_family is socket.AF_INET6:                                    # return True
             hi, lo = struct.unpack("!QQ", inet_pton(addr_family, addr))
             ip = (hi << 64) | lo
             return any(map(lambda n_ps: n_ps[0] == ip >> n_ps[1],
