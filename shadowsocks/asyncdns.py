@@ -289,19 +289,6 @@ def parse_response(data):
         return None
 
 
-# Try to find the ip address family
-def is_ip(address):
-    for family in (socket.AF_INET, socket.AF_INET6):
-        try:
-            if type(address) != str:
-                address = address.decode('utf8')
-            socket.inet_pton(family, address)
-            return family
-        except (TypeError, ValueError, OSError, IOError):
-            pass
-    return False
-
-
 # If all part of hostname (split by dot) match the regexp VALID_HOSTNAME, return True.
 def is_valid_hostname(hostname):
     if len(hostname) > 255:
@@ -357,7 +344,7 @@ class DNSResolver(object):
                             parts = line.split()
                             if len(parts) >= 2:
                                 server = parts[1]
-                                if is_ip(server) == socket.AF_INET:
+                                if common.is_ip(server) == socket.AF_INET:
                                     if type(server) != str:
                                         server = server.decode('utf8')
                                     self._servers.append(server)
@@ -379,7 +366,7 @@ class DNSResolver(object):
                     parts = line.split()
                     if len(parts) >= 2:
                         ip = parts[0]
-                        if is_ip(ip):
+                        if common.is_ip(ip):
                             for i in range(1, len(parts)):
                                 hostname = parts[i]
                                 if hostname:
@@ -490,11 +477,11 @@ class DNSResolver(object):
 
     # Resolve hostname
     def resolve(self, hostname, callback):
-        if type(hostname) != bytes:								# Compatible with Python 3
-            hostname = hostname.encode('utf8')					# Convert to bytes
+        if type(hostname) != bytes:                             # Compatible with Python 3
+            hostname = hostname.encode('utf8')                  # Convert to bytes
         if not hostname:                                        # Raise exception if hostname is empty
             callback(None, Exception('empty hostname'))
-        elif is_ip(hostname):                                   # Directly return if hostname is IP address
+        elif common.is_ip(hostname):                            # Directly return if hostname is IP address
             callback((hostname, hostname), None)
         elif hostname in self._hosts:                           # Directly return if hostname in /etc/hosts
             logging.debug('hit hosts: %s', hostname)
