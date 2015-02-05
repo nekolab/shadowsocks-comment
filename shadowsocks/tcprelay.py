@@ -128,13 +128,13 @@ class TCPRelayHandler(object):
         else:
             self._forbidden_iplist = None
         if is_local:
-            self._chosen_server = self._get_a_server()
-        fd_to_handlers[local_sock.fileno()] = self
+            self._chosen_server = self._get_a_server()  # random choose a server in the config
+        fd_to_handlers[local_sock.fileno()] = self      # set connect socket fd
         local_sock.setblocking(False)
         local_sock.setsockopt(socket.SOL_TCP, socket.TCP_NODELAY, 1)
         loop.add(local_sock, eventloop.POLL_IN | eventloop.POLL_ERR)
         self.last_activity = 0
-        self._update_activity()
+        self._update_activity()   # refresh timeout
 
     def __hash__(self):
         # default __hash__ is id / 16
@@ -580,11 +580,17 @@ class TCPRelay(object):
             listen_port = config['server_port']
         self._listen_port = listen_port
 
+        # Get the standard struct of listen socket. It return a list.
         addrs = socket.getaddrinfo(listen_addr, listen_port, 0,
                                    socket.SOCK_STREAM, socket.SOL_TCP)
         if len(addrs) == 0:
             raise Exception("can't get addrinfo for %s:%d" %
                             (listen_addr, listen_port))
+        # af        : means ai_family may be ipv4, ipv6 or protocol independent
+        # socktype  : means socket type may be TCP or UDP
+        # proto     : at most of time it should be 0
+        # canonname : canonical hostname
+        # sa        : means sockaddr use to bind server
         af, socktype, proto, canonname, sa = addrs[0]
         server_socket = socket.socket(af, socktype, proto)
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -605,9 +611,9 @@ class TCPRelay(object):
         if self._closed:
             raise Exception('already closed')
         self._eventloop = loop
-        loop.add_handler(self._handle_events)
+        loop.add_handler(self._handle_events)   # add our self handler method to the eventloop
 
-        self._eventloop.add(self._server_socket,
+        self._eventloop.add(self._server_socket,                    #add our server socket to the eventloop
                             eventloop.POLL_IN | eventloop.POLL_ERR)
 
     def remove_handler(self, handler):
@@ -672,13 +678,13 @@ class TCPRelay(object):
             if sock:
                 logging.log(utils.VERBOSE_LEVEL, 'fd %d %s', fd,
                             eventloop.EVENT_NAMES.get(event, event))
-            if sock == self._server_socket:
+            if sock == self._server_socket:         # judge if current sock in the loop is our server socket self.
                 if event & eventloop.POLL_ERR:
                     # TODO
                     raise Exception('server_socket error')
                 try:
                     logging.debug('accept')
-                    conn = self._server_socket.accept()
+                    conn = self._server_socket.accept()     # accept this socket connect.
                     TCPRelayHandler(self, self._fd_to_handlers,
                                     self._eventloop, conn[0], self._config,
                                     self._dns_resolver, self._is_local)
